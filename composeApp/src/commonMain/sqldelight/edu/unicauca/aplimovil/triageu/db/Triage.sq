@@ -1,0 +1,113 @@
+-- Equivalente local de los @Model de SwiftData (TriageActivity, Subject)
+-- más la cola de sincronización y los IDs ya sincronizados que antes vivían en UserDefaults.
+-- Fechas: epoch en milisegundos. Booleanos: 0/1.
+
+CREATE TABLE ActivityEntity (
+    id TEXT NOT NULL PRIMARY KEY,
+    title TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    type TEXT NOT NULL,
+    dueDate INTEGER NOT NULL,
+    hasDueTime INTEGER NOT NULL DEFAULT 0,
+    weightPercent INTEGER,
+    preparation INTEGER NOT NULL,
+    durationMin INTEGER NOT NULL,
+    priority TEXT NOT NULL,
+    completed INTEGER NOT NULL DEFAULT 0,
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL
+);
+
+CREATE TABLE SubjectEntity (
+    id TEXT NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    colorHex TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL
+);
+
+-- Un único elemento pendiente por (tabla, id, usuario): el más nuevo reemplaza al anterior.
+CREATE TABLE SyncItem (
+    tbl TEXT NOT NULL,
+    id TEXT NOT NULL,
+    userId TEXT NOT NULL,
+    op TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    queuedAt INTEGER NOT NULL,
+    PRIMARY KEY (tbl, id, userId)
+);
+
+CREATE TABLE SyncedId (
+    userId TEXT NOT NULL,
+    tbl TEXT NOT NULL,
+    id TEXT NOT NULL,
+    PRIMARY KEY (userId, tbl, id)
+);
+
+-- Actividades
+selectActivities:
+SELECT * FROM ActivityEntity;
+
+selectActivity:
+SELECT * FROM ActivityEntity WHERE id = ?;
+
+upsertActivity:
+INSERT OR REPLACE INTO ActivityEntity VALUES ?;
+
+deleteActivity:
+DELETE FROM ActivityEntity WHERE id = ?;
+
+deleteAllActivities:
+DELETE FROM ActivityEntity;
+
+-- Materias
+selectSubjects:
+SELECT * FROM SubjectEntity;
+
+selectSubject:
+SELECT * FROM SubjectEntity WHERE id = ?;
+
+upsertSubject:
+INSERT OR REPLACE INTO SubjectEntity VALUES ?;
+
+deleteSubject:
+DELETE FROM SubjectEntity WHERE id = ?;
+
+deleteAllSubjects:
+DELETE FROM SubjectEntity;
+
+-- Cola de sincronización
+selectQueue:
+SELECT * FROM SyncItem WHERE userId = ? ORDER BY queuedAt;
+
+upsertQueue:
+INSERT OR REPLACE INTO SyncItem VALUES ?;
+
+deleteQueueItem:
+DELETE FROM SyncItem WHERE tbl = ? AND id = ? AND userId = ? AND queuedAt = ?;
+
+bumpQueueItem:
+UPDATE SyncItem SET attempts = attempts + 1
+WHERE tbl = ? AND id = ? AND userId = ? AND queuedAt = ?;
+
+deleteAllQueue:
+DELETE FROM SyncItem;
+
+countQueue:
+SELECT COUNT(*) FROM SyncItem WHERE userId = ?;
+
+countPendingDelete:
+SELECT COUNT(*) FROM SyncItem WHERE tbl = ? AND id = ? AND op = 'delete';
+
+-- IDs ya sincronizados (para propagar borrados entre dispositivos)
+selectSynced:
+SELECT id FROM SyncedId WHERE userId = ? AND tbl = ?;
+
+insertSynced:
+INSERT OR IGNORE INTO SyncedId(userId, tbl, id) VALUES (?, ?, ?);
+
+deleteSynced:
+DELETE FROM SyncedId WHERE userId = ? AND tbl = ? AND id = ?;
+
+clearSynced:
+DELETE FROM SyncedId WHERE userId = ? AND tbl = ?;

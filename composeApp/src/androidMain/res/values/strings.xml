@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">TriageU</string>
+    <string name="widget_name">Próximas entregas</string>
+    <string name="widget_description">Tus actividades pendientes más urgentes.</string>
+    <string name="reminders_channel">Recordatorios de entrega</string>
+</resources>
