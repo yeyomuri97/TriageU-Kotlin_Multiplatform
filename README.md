@@ -1,10 +1,5 @@
 # TriageU · Kotlin Multiplatform
 
-Migración de la app iOS (SwiftUI + SwiftData) a **Kotlin Multiplatform + Compose Multiplatform**.
-Una sola base de código para Android e iOS. El proyecto Swift original sigue intacto en `../TriageU/` como referencia.
-
-> **Estado:** escrito y revisado estáticamente, **no compilado** (el entorno donde se generó no tenía acceso a Maven/Google).
-> Al primer `./gradlew` pueden aparecer pequeños ajustes de API.
 
 ## Estructura
 
