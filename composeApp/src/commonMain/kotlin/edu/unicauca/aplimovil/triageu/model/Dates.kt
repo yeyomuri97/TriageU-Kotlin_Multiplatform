@@ -12,7 +12,7 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.until
-
+//aurelio
 private val weekdays = listOf("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
 private val months = listOf(
     "enero", "febrero", "marzo", "abril", "mayo", "junio",
