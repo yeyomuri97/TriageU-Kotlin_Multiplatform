@@ -3,6 +3,7 @@
 package edu.unicauca.aplimovil.triageu
 
 import androidx.compose.foundation.background
+import edu.unicauca.aplimovil.triageu.ui.GlossaryScreen
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
