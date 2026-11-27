@@ -94,6 +94,9 @@ fun ProgressScreen(store: TriageStore) {
     val highPending = scoped.count { !it.completed && it.priority == Priority.HIGH }
     val pct = if (total == 0) 0 else (done * 100) / total
     val ratio = if (total == 0) 0f else done.toFloat() / total
+    val recommendations = remember(activities, nowMs) {
+        buildAcademicRecommendations(activities, nowMs)
+    }
 
     fun colorFor(name: String): Color =
         subjects.firstOrNull { it.name == name }?.let { colorFromHex(it.colorHex) } ?: TriageGreen
@@ -106,6 +109,9 @@ fun ProgressScreen(store: TriageStore) {
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         ScreenTitle("Progreso")
+        if (recommendations.isNotEmpty()) {
+            AcademicRecommendationsCard(recommendations)
+        }
 
         PeriodPills(period) { period = it }
 
@@ -484,5 +490,176 @@ private fun MotivationCard(
     ) {
         Text(title, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = TriageGreenDark)
         Text(body, fontSize = 15.sp, color = TextSecondary)
+    }
+}
+
+/**
+ * Representa una recomendación generada a partir
+ * de las actividades pendientes del estudiante.
+ */
+private data class AcademicRecommendation(
+    val activity: Activity,
+    val reason: String,
+    val status: String
+)
+
+/**
+ * Analiza las actividades y determina cuáles requieren
+ * atención primero.
+ */
+private fun buildAcademicRecommendations(
+    activities: List<Activity>,
+    nowMs: Long
+): List<AcademicRecommendation> {
+
+    val pendingActivities = activities
+        .filter { !it.completed }
+        .sortedWith(
+            compareBy<Activity> {
+                // Las actividades vencidas se atienden primero.
+                if (it.dueDate.toEpochMilliseconds() < nowMs) 0 else 1
+            }.thenBy {
+                // Después se considera la prioridad académica.
+                Priority.rank(it.priority)
+            }.thenBy {
+                // Finalmente, la fecha de entrega más cercana.
+                it.dueDate.toEpochMilliseconds()
+            }
+        )
+
+    return pendingActivities
+        .take(3)
+        .map { activity ->
+
+            val isOverdue =
+                activity.dueDate.toEpochMilliseconds() < nowMs
+
+            val reason = when {
+                isOverdue ->
+                    "Esta actividad ya está vencida. Es importante atenderla cuanto antes."
+
+                activity.priority == Priority.HIGH ->
+                    "Tiene prioridad alta. Conviene dedicarle atención antes que a otras actividades."
+
+                activity.priority == Priority.MEDIUM ->
+                    "Tiene prioridad media. Organiza tiempo para avanzar antes de su entrega."
+
+                else ->
+                    "Aunque tiene prioridad baja, es recomendable avanzar para evitar acumulaciones."
+            }
+
+            val status = when {
+                isOverdue -> "VENCIDA"
+                activity.priority == Priority.HIGH -> "PRIORIDAD ALTA"
+                activity.priority == Priority.MEDIUM -> "PRIORIDAD MEDIA"
+                else -> "PRIORIDAD BAJA"
+            }
+
+            AcademicRecommendation(
+                activity = activity,
+                reason = reason,
+                status = status
+            )
+        }
+}
+
+/**
+ * Presenta las recomendaciones académicas en el panel de progreso.
+ */
+@Composable
+private fun AcademicRecommendationsCard(
+    recommendations: List<AcademicRecommendation>
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .triageCard()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "✦",
+                fontSize = 25.sp,
+                color = Color(0xFFD97706)
+            )
+
+            Column {
+                Text(
+                    "Recomendaciones académicas",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TriageGreenDark
+                )
+
+                Text(
+                    "Actividades que requieren tu atención",
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+            }
+        }
+
+        recommendations.forEachIndexed { index, recommendation ->
+            val activity = recommendation.activity
+
+            Column(
+                Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "${index + 1}. ${activity.title}",
+                        modifier = Modifier.weight(1f),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TriageGreenDark
+                    )
+                }
+
+                Text(
+                    activity.subject,
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+
+                Text(
+                    recommendation.status,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = when (recommendation.status) {
+                        "VENCIDA" -> ErrorRed
+                        "PRIORIDAD ALTA" -> Color(0xFFB45309)
+                        "PRIORIDAD MEDIA" -> Color(0xFFCA8A04)
+                        else -> TriageGreen
+                    }
+                )
+
+                Text(
+                    recommendation.reason,
+                    fontSize = 13.sp,
+                    color = TextSecondary
+                )
+            }
+
+            if (index != recommendations.lastIndex) {
+                androidx.compose.material3.HorizontalDivider(
+                    color = SoftGreen
+                )
+            }
+        }
+
+        Text(
+            "Las recomendaciones se actualizan automáticamente cuando cambian tus actividades.",
+            fontSize = 11.sp,
+            color = TextSecondary
+        )
     }
 }
