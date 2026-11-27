@@ -84,7 +84,8 @@ fun ProfileScreen(
     store: TriageStore,
     onAboutTap: () -> Unit,
     onLoginTap: () -> Unit,
-    onOpenAssistant: () -> Unit = {}
+    onOpenAssistant: () -> Unit = {},
+    onGlossaryTap: () -> Unit = {}
 ) {
     val session by store.auth.session.collectAsState()
     val subjects by store.subjects.collectAsState()
@@ -259,6 +260,15 @@ fun ProfileScreen(
             SettingsRow(Icons.Filled.SmartToy, "Abrir asistente Tri", "Pregúntale a Tri", onClick = onOpenAssistant)
             SettingsRow(Icons.AutoMirrored.Filled.Help, "Preguntas frecuentes", null, onClick = { showFaq = true })
             SettingsRow(Icons.Filled.Email, "Reportar un problema", null) { openExternalUrl(TriageULinks.REPORT_EMAIL) }
+        }
+
+        SettingsCard("Herramientas académicas") {
+            SettingsRow(
+                Icons.Filled.Info,
+                "Glosario académico",
+                "Consulta conceptos y técnicas de estudio",
+                onClick = onGlossaryTap
+            )
         }
 
         SettingsCard("Legal y datos") {

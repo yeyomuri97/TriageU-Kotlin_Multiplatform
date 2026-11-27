@@ -112,9 +112,16 @@ private fun MainContent(
     var tab by remember { mutableStateOf(Tab.TODAY) }
     // El formulario sobrevive al cambio de pestaña, como el TriageViewModel de iOS.
     val form = remember { ActivityFormState() }
+    var showGlossary by remember { mutableStateOf(false) }
 
     if (showAbout) {
         AboutScreen(onBack = { setShowAbout(false) })
+        return
+    }
+    if (showGlossary) {
+        GlossaryScreen(
+            onBack = { showGlossary = false }
+        )
         return
     }
 
@@ -129,7 +136,8 @@ private fun MainContent(
                     store,
                     onAboutTap = { setShowAbout(true) },
                     onLoginTap = onLoginTap,
-                    onOpenAssistant = onOpenAssistant
+                    onOpenAssistant = onOpenAssistant,
+                    onGlossaryTap = { showGlossary = true }
                 )
             }
         }
