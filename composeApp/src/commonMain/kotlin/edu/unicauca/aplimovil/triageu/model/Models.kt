@@ -1,11 +1,10 @@
-
 package edu.unicauca.aplimovil.triageu.model
 
 import kotlinx.datetime.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-/** Equivalente de TriageActivity (SwiftData). Inmutable: los cambios crean una copia. */
+/** Equivalente de `TriageActivity` (SwiftData). Inmutable: los cambios crean una copia. */
 data class Activity(
     val id: String,
     val title: String,
@@ -22,7 +21,7 @@ data class Activity(
     val updatedAt: Instant
 )
 
-/** Equivalente de Subject (SwiftData). */
+/** Equivalente de `Subject` (SwiftData). */
 data class Subject(
     val id: String,
     val name: String,
@@ -31,7 +30,7 @@ data class Subject(
     val updatedAt: Instant
 )
 
-/** Los IDs se manejan siempre en minúsculas. */
+/** Los IDs se manejan siempre en minúsculas (Postgres los devuelve así). */
 @OptIn(ExperimentalUuidApi::class)
 fun newId(): String = Uuid.random().toString().lowercase()
 
@@ -42,7 +41,7 @@ object Priority {
 
     val all = listOf(HIGH, MEDIUM, LOW)
 
-    /** Misma regla que TriageViewModel.calculatePriority. */
+    /** Misma regla que `TriageViewModel.calculatePriority`. */
     fun calculate(preparation: Int, weight: Int?): String {
         val w = weight ?: 0
         if (preparation <= 2 || w >= 30) return HIGH
@@ -56,8 +55,7 @@ object Priority {
         else -> 2
     }
 
-    fun label(p: String): String =
-        p.lowercase().replaceFirstChar { it.uppercase() }
+    fun label(p: String): String = p.lowercase().replaceFirstChar { it.uppercase() }
 }
 
 object ActivityTypes {
@@ -78,27 +76,4 @@ object SubjectDefaults {
         "#4F7A68", "#3B82F6", "#F59E0B", "#EF4444",
         "#8B5CF6", "#EC4899", "#14B8A6", "#64748B"
     )
-}
-
-/**
- * Representa un concepto académico del glosario de TriageU.
- *
- * Cada término tiene un identificador, nombre, definición
- * y una categoría para organizarlo.
- */
-data class GlossaryTerm(
-    val id: String,
-    val title: String,
-    val definition: String,
-    val category: String,
-    val example: String
-)
-
-/** Categorías disponibles para clasificar los conceptos del glosario. */
-object GlossaryCategories {
-    const val STUDY = "Técnicas de estudio"
-    const val PLANNING = "Planificación"
-    const val PRODUCTIVITY = "Productividad"
-
-    val all = listOf(STUDY, PLANNING, PRODUCTIVITY)
 }
