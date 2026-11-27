@@ -141,10 +141,19 @@ fun ProgressScreen(store: TriageStore) {
             }
             .filter { it.total > 0 }
             .sortedByDescending { it.total }
-
         if (bySubject.isNotEmpty()) {
             BySubjectCard(bySubject, subjects, ::colorFor)
+
+            val subjectToImprove = bySubject.minByOrNull {
+                it.done.toFloat() / it.total
+            }
+
+            if (subjectToImprove != null) {
+                SubjectInsightCard(subjectToImprove)
+            }
         }
+
+
 
         MotivationCard(
             total = total,
@@ -350,6 +359,101 @@ private fun BySubjectCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SubjectInsightCard(subject: SubjectProgress) {
+    val completion = if (subject.total > 0) {
+        (subject.done * 100) / subject.total
+    } else {
+        0
+    }
+
+    val remaining = subject.total - subject.done
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .triageCard()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFFF1D6)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "!",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFB45309)
+                )
+            }
+
+            Text(
+                "Materia que necesita atención",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TriageGreenDark
+            )
+        }
+
+        Text(
+            subject.name,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = TriageGreenDark
+        )
+
+        Text(
+            "Tiene el menor porcentaje de cumplimiento entre tus materias en este periodo.",
+            fontSize = 14.sp,
+            color = TextSecondary
+        )
+
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Cumplimiento",
+                fontSize = 14.sp,
+                color = TextSecondary
+            )
+
+            Text(
+                "$completion%",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFB45309)
+            )
+        }
+
+        LinearProgressIndicator(
+            progress = { completion / 100f },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp)),
+            color = Color(0xFFD97706),
+            trackColor = SoftGreen
+        )
+
+        Text(
+            "$remaining ${if (remaining == 1) "actividad pendiente" else "actividades pendientes"} de ${subject.total}",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = TextSecondary
+        )
     }
 }
 
