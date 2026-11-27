@@ -39,6 +39,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import edu.unicauca.aplimovil.triageu.TriageStore
+import edu.unicauca.aplimovil.triageu.domain.AcademicAnalyzer
+import edu.unicauca.aplimovil.triageu.domain.AcademicRecommendation
+import edu.unicauca.aplimovil.triageu.domain.SubjectProgress
 import edu.unicauca.aplimovil.triageu.model.Activity
 import edu.unicauca.aplimovil.triageu.model.Priority
 import edu.unicauca.aplimovil.triageu.model.Subject
@@ -56,110 +59,234 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
 
 private enum class ProgressPeriod(val label: String) {
-    WEEK("Semana"), MONTH("Mes"), ALL("Todo")
+    WEEK("Semana"),
+    MONTH("Mes"),
+    ALL("Todo")
 }
 
-private fun Activity.dueLocal() = dueDate.localDate(currentTimeZone())
+private fun Activity.dueLocal() =
+    dueDate.localDate(currentTimeZone())
 
-private fun filterByPeriod(activities: List<Activity>, period: ProgressPeriod, now: LocalDate): List<Activity> =
+private fun filterByPeriod(
+    activities: List<Activity>,
+    period: ProgressPeriod,
+    now: LocalDate
+): List<Activity> =
     when (period) {
         ProgressPeriod.ALL -> activities
+
         ProgressPeriod.WEEK -> {
             val start = now.startOfWeek()
             val end = now.endOfWeek()
-            activities.filter { it.dueLocal() in start..end }
+
+            activities.filter {
+                it.dueLocal() in start..end
+            }
         }
+
         ProgressPeriod.MONTH -> {
             val start = now.firstOfMonth()
-            val end = start.plus(now.daysInMonth() - 1, DateTimeUnit.DAY)
-            activities.filter { it.dueLocal() in start..end }
+            val end = start.plus(
+                now.daysInMonth() - 1,
+                DateTimeUnit.DAY
+            )
+
+            activities.filter {
+                it.dueLocal() in start..end
+            }
         }
     }
 
 @Composable
 fun ProgressScreen(store: TriageStore) {
+
     val activities by store.activities.collectAsState()
     val subjects by store.subjects.collectAsState()
-    var period by remember { mutableStateOf(ProgressPeriod.WEEK) }
+
+    var period by remember {
+        mutableStateOf(ProgressPeriod.WEEK)
+    }
 
     val tz = currentTimeZone()
     val nowDate = today(tz)
     val nowMs = nowInstant().toEpochMilliseconds()
 
-    val scoped = remember(activities, period, nowDate) { filterByPeriod(activities, period, nowDate) }
-    val total = scoped.size
-    val done = scoped.count { it.completed }
-    val pending = total - done
-    val overdue = scoped.count { !it.completed && it.dueDate.toEpochMilliseconds() < nowMs }
-    val highPending = scoped.count { !it.completed && it.priority == Priority.HIGH }
-    val pct = if (total == 0) 0 else (done * 100) / total
-    val ratio = if (total == 0) 0f else done.toFloat() / total
-    val recommendations = remember(activities, nowMs) {
-        buildAcademicRecommendations(activities, nowMs)
+    val scoped = remember(
+        activities,
+        period,
+        nowDate
+    ) {
+        filterByPeriod(
+            activities,
+            period,
+            nowDate
+        )
     }
 
+    val total = scoped.size
+
+    val done =
+        scoped.count {
+            it.completed
+        }
+
+    val pending =
+        total - done
+
+    val overdue =
+        scoped.count {
+            !it.completed &&
+                    it.dueDate.toEpochMilliseconds() < nowMs
+        }
+
+    val highPending =
+        scoped.count {
+            !it.completed &&
+                    it.priority == Priority.HIGH
+        }
+
+    val pct =
+        if (total == 0) {
+            0
+        } else {
+            (done * 100) / total
+        }
+
+    val ratio =
+        if (total == 0) {
+            0f
+        } else {
+            done.toFloat() / total
+        }
+
+    val recommendations =
+        remember(
+            activities,
+            nowMs
+        ) {
+            AcademicAnalyzer.recommendations(
+                activities = activities,
+                nowMs = nowMs
+            )
+        }
+
     fun colorFor(name: String): Color =
-        subjects.firstOrNull { it.name == name }?.let { colorFromHex(it.colorHex) } ?: TriageGreen
+        subjects
+            .firstOrNull {
+                it.name == name
+            }
+            ?.let {
+                colorFromHex(it.colorHex)
+            }
+            ?: TriageGreen
 
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(start = 20.dp, end = 20.dp, top = 30.dp, bottom = 40.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+            .verticalScroll(
+                rememberScrollState()
+            )
+            .padding(
+                start = 20.dp,
+                end = 20.dp,
+                top = 30.dp,
+                bottom = 40.dp
+            ),
+        verticalArrangement =
+            Arrangement.spacedBy(20.dp)
     ) {
+
         ScreenTitle("Progreso")
+
         if (recommendations.isNotEmpty()) {
-            AcademicRecommendationsCard(recommendations)
+            AcademicRecommendationsCard(
+                recommendations
+            )
         }
 
-        PeriodPills(period) { period = it }
+        PeriodPills(period) {
+            period = it
+        }
 
-        CompletionCard(ratio, pct, done, total)
+        CompletionCard(
+            ratio,
+            pct,
+            done,
+            total
+        )
 
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.spacedBy(10.dp)
+        ) {
+
             StatChip(
-                modifier = Modifier.weight(1f),
+                modifier =
+                    Modifier.weight(1f),
                 label = "Pendientes",
                 value = "$pending",
                 accent = TextSecondary
             )
+
             StatChip(
-                modifier = Modifier.weight(1f),
+                modifier =
+                    Modifier.weight(1f),
                 label = "Vencidas",
                 value = "$overdue",
-                accent = if (overdue > 0) ErrorRed else TextSecondary
+                accent =
+                    if (overdue > 0) {
+                        ErrorRed
+                    } else {
+                        TextSecondary
+                    }
             )
+
             StatChip(
-                modifier = Modifier.weight(1f),
+                modifier =
+                    Modifier.weight(1f),
                 label = "Alta pendiente",
                 value = "$highPending",
-                accent = if (highPending > 0) Color(0xFFB45309) else TextSecondary
+                accent =
+                    if (highPending > 0) {
+                        Color(0xFFB45309)
+                    } else {
+                        TextSecondary
+                    }
             )
         }
 
-        WeekDeliveriesCard(activities, nowDate)
+        WeekDeliveriesCard(
+            activities,
+            nowDate
+        )
 
-        val bySubject = scoped
-            .groupBy { it.subject }
-            .map { (name, list) ->
-                SubjectProgress(name, list.count { it.completed }, list.size)
+        val bySubject =
+            remember(scoped) {
+                AcademicAnalyzer
+                    .subjectProgress(scoped)
             }
-            .filter { it.total > 0 }
-            .sortedByDescending { it.total }
+
         if (bySubject.isNotEmpty()) {
-            BySubjectCard(bySubject, subjects, ::colorFor)
 
-            val subjectToImprove = bySubject.minByOrNull {
-                it.done.toFloat() / it.total
-            }
+            BySubjectCard(
+                rows = bySubject,
+                subjects = subjects,
+                colorFor = ::colorFor
+            )
+
+            val subjectToImprove =
+                AcademicAnalyzer
+                    .subjectToImprove(
+                        bySubject
+                    )
 
             if (subjectToImprove != null) {
-                SubjectInsightCard(subjectToImprove)
+                SubjectInsightCard(
+                    subjectToImprove
+                )
             }
         }
-
-
 
         MotivationCard(
             total = total,
@@ -172,41 +299,110 @@ fun ProgressScreen(store: TriageStore) {
 }
 
 @Composable
-private fun PeriodPills(selected: ProgressPeriod, onSelect: (ProgressPeriod) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ProgressPeriod.entries.forEach { p ->
-            val active = p == selected
-            Text(
-                p.label,
-                fontSize = 14.sp,
-                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (active) Color.White else TriageGreenDark,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(if (active) TriageGreen else SoftGreen)
-                    .clickable { onSelect(p) }
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-        }
+private fun PeriodPills(
+    selected: ProgressPeriod,
+    onSelect: (ProgressPeriod) -> Unit
+) {
+
+    Row(
+        horizontalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
+
+        ProgressPeriod.entries
+            .forEach { period ->
+
+                val active =
+                    period == selected
+
+                Text(
+                    text = period.label,
+                    fontSize = 14.sp,
+                    fontWeight =
+                        if (active) {
+                            FontWeight.SemiBold
+                        } else {
+                            FontWeight.Normal
+                        },
+                    color =
+                        if (active) {
+                            Color.White
+                        } else {
+                            TriageGreenDark
+                        },
+                    modifier =
+                        Modifier
+                            .clip(
+                                RoundedCornerShape(
+                                    20.dp
+                                )
+                            )
+                            .background(
+                                if (active) {
+                                    TriageGreen
+                                } else {
+                                    SoftGreen
+                                }
+                            )
+                            .clickable {
+                                onSelect(period)
+                            }
+                            .padding(
+                                horizontal = 16.dp,
+                                vertical = 8.dp
+                            )
+                )
+            }
     }
 }
 
 @Composable
-private fun CompletionCard(ratio: Float, pct: Int, done: Int, total: Int) {
+private fun CompletionCard(
+    ratio: Float,
+    pct: Int,
+    done: Int,
+    total: Int
+) {
+
     Row(
         Modifier
             .fillMaxWidth()
             .triageCard()
             .padding(20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        verticalAlignment =
+            Alignment.CenterVertically,
+        horizontalArrangement =
+            Arrangement.spacedBy(16.dp)
     ) {
-        Box(Modifier.size(120.dp), contentAlignment = Alignment.Center) {
-            Canvas(Modifier.fillMaxSize()) {
-                val stroke = 14.dp.toPx()
-                val inset = stroke / 2f
-                val arcSize = Size(size.width - stroke, size.height - stroke)
-                val topLeft = Offset(inset, inset)
+
+        Box(
+            Modifier.size(120.dp),
+            contentAlignment =
+                Alignment.Center
+        ) {
+
+            Canvas(
+                Modifier.fillMaxSize()
+            ) {
+
+                val stroke =
+                    14.dp.toPx()
+
+                val inset =
+                    stroke / 2f
+
+                val arcSize =
+                    Size(
+                        size.width - stroke,
+                        size.height - stroke
+                    )
+
+                val topLeft =
+                    Offset(
+                        inset,
+                        inset
+                    )
+
                 drawArc(
                     color = SoftGreen,
                     startAngle = -90f,
@@ -214,124 +410,380 @@ private fun CompletionCard(ratio: Float, pct: Int, done: Int, total: Int) {
                     useCenter = false,
                     topLeft = topLeft,
                     size = arcSize,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round)
+                    style =
+                        Stroke(
+                            width = stroke,
+                            cap = StrokeCap.Round
+                        )
                 )
+
                 if (ratio > 0f) {
+
                     drawArc(
                         color = TriageGreen,
                         startAngle = -90f,
-                        sweepAngle = 360f * ratio.coerceIn(0f, 1f),
+                        sweepAngle =
+                            360f *
+                                    ratio.coerceIn(
+                                        0f,
+                                        1f
+                                    ),
                         useCenter = false,
                         topLeft = topLeft,
                         size = arcSize,
-                        style = Stroke(width = stroke, cap = StrokeCap.Round)
+                        style =
+                            Stroke(
+                                width = stroke,
+                                cap = StrokeCap.Round
+                            )
                     )
                 }
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("$pct%", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = TriageGreenDark)
-                Text("cumplido", fontSize = 13.sp, color = TextSecondary)
-            }
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("$done de $total", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = TriageGreenDark)
-            Text("actividades completadas", fontSize = 15.sp, color = TextSecondary)
-        }
-    }
-}
 
-@Composable
-private fun StatChip(modifier: Modifier, label: String, value: String, accent: Color) {
-    Column(
-        modifier
-            .triageCard(14.dp)
-            .padding(horizontal = 12.dp, vertical = 14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Text(value, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = accent)
-        Text(label, fontSize = 12.sp, color = TextSecondary, textAlign = TextAlign.Center)
-    }
-}
+            Column(
+                horizontalAlignment =
+                    Alignment.CenterHorizontally
+            ) {
 
-@Composable
-private fun WeekDeliveriesCard(activities: List<Activity>, today: LocalDate) {
-    val weekStart = today.startOfWeek()
-    val days = (0..6).map { weekStart.plus(it, DateTimeUnit.DAY) }
-  val counts = days.map { day ->
-        val dayActs = activities.filter { it.dueLocal() == day }
-        dayActs.size to dayActs.count { it.completed }
-    }
-    val maxTotal = counts.maxOfOrNull { it.first }?.coerceAtLeast(1) ?: 1
-
-    Column(
-        Modifier.fillMaxWidth().triageCard().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text("Entregas de la semana", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = TriageGreenDark)
-
-        Canvas(Modifier.fillMaxWidth().height(120.dp)) {
-            val barGap = 8.dp.toPx()
-            val labelSpace = 0f
-            val chartH = size.height - labelSpace
-            val barW = (size.width - barGap * 6) / 7f
-
-            days.forEachIndexed { i, day ->
-                val (total, completed) = counts[i]
-                val x = i * (barW + barGap)
-                val totalH = if (total == 0) 0f else (total.toFloat() / maxTotal) * chartH * 0.92f
-                val doneH = if (total == 0) 0f else (completed.toFloat() / maxTotal) * chartH * 0.92f
-                val baseY = size.height
-
-                if (totalH > 0f) {
-                    drawRoundRect(
-                        color = SoftGreen,
-                        topLeft = Offset(x, baseY - totalH),
-                        size = Size(barW, totalH),
-                        cornerRadius = CornerRadius(6.dp.toPx(), 6.dp.toPx())
-                    )
-                }
-                if (doneH > 0f) {
-                    drawRoundRect(
-                        color = if (day == today) TriageGreenDark else TriageGreen,
-                        topLeft = Offset(x, baseY - doneH),
-                        size = Size(barW, doneH),
-                        cornerRadius = CornerRadius(6.dp.toPx(), 6.dp.toPx())
-                    )
-                }
-            }
-        }
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            days.forEachIndexed { i, day ->
-                val isToday = day == today
                 Text(
-                    weekdayInitials[i],
+                    "$pct%",
+                    fontSize = 28.sp,
+                    fontWeight =
+                        FontWeight.Bold,
+                    color =
+                        TriageGreenDark
+                )
+
+                Text(
+                    "cumplido",
                     fontSize = 13.sp,
-                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                    color = if (isToday) TriageGreenDark else TextSecondary,
-                    modifier = Modifier.width(36.dp),
-                    textAlign = TextAlign.Center
+                    color =
+                        TextSecondary
                 )
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            LegendDot(SoftGreen, "Total del día")
-            LegendDot(TriageGreen, "Completadas")
+        Column(
+            verticalArrangement =
+                Arrangement.spacedBy(6.dp)
+        ) {
+
+            Text(
+                "$done de $total",
+                fontSize = 26.sp,
+                fontWeight =
+                    FontWeight.Bold,
+                color =
+                    TriageGreenDark
+            )
+
+            Text(
+                "actividades completadas",
+                fontSize = 15.sp,
+                color =
+                    TextSecondary
+            )
         }
     }
 }
 
 @Composable
-private fun LegendDot(color: Color, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Box(Modifier.size(10.dp).clip(CircleShape).background(color))
-        Text(text, fontSize = 12.sp, color = TextSecondary)
+private fun StatChip(
+    modifier: Modifier,
+    label: String,
+    value: String,
+    accent: Color
+) {
+
+    Column(
+        modifier
+            .triageCard(14.dp)
+            .padding(
+                horizontal = 12.dp,
+                vertical = 14.dp
+            ),
+        horizontalAlignment =
+            Alignment.CenterHorizontally,
+        verticalArrangement =
+            Arrangement.spacedBy(4.dp)
+    ) {
+
+        Text(
+            value,
+            fontSize = 22.sp,
+            fontWeight =
+                FontWeight.Bold,
+            color = accent
+        )
+
+        Text(
+            label,
+            fontSize = 12.sp,
+            color =
+                TextSecondary,
+            textAlign =
+                TextAlign.Center
+        )
     }
 }
 
-private data class SubjectProgress(val name: String, val done: Int, val total: Int)
+@Composable
+private fun WeekDeliveriesCard(
+    activities: List<Activity>,
+    today: LocalDate
+) {
+
+    val weekStart =
+        today.startOfWeek()
+
+    val days =
+        (0..6).map {
+            weekStart.plus(
+                it,
+                DateTimeUnit.DAY
+            )
+        }
+
+    val counts =
+        days.map { day ->
+
+            val dayActivities =
+                activities.filter {
+                    it.dueLocal() == day
+                }
+
+            dayActivities.size to
+                    dayActivities.count {
+                        it.completed
+                    }
+        }
+
+    val maxTotal =
+        counts
+            .maxOfOrNull {
+                it.first
+            }
+            ?.coerceAtLeast(1)
+            ?: 1
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .triageCard()
+            .padding(16.dp),
+        verticalArrangement =
+            Arrangement.spacedBy(12.dp)
+    ) {
+
+        Text(
+            "Entregas de la semana",
+            fontSize = 18.sp,
+            fontWeight =
+                FontWeight.SemiBold,
+            color =
+                TriageGreenDark
+        )
+
+        Canvas(
+            Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+        ) {
+
+            val barGap =
+                8.dp.toPx()
+
+            val chartHeight =
+                size.height
+
+            val barWidth =
+                (
+                        size.width -
+                                barGap * 6
+                        ) / 7f
+
+            days.forEachIndexed {
+                    index,
+                    day ->
+
+                val pair =
+                    counts[index]
+
+                val total =
+                    pair.first
+
+                val completed =
+                    pair.second
+
+                val x =
+                    index *
+                            (
+                                    barWidth +
+                                            barGap
+                                    )
+
+                val totalHeight =
+                    if (total == 0) {
+                        0f
+                    } else {
+                        (
+                                total.toFloat() /
+                                        maxTotal
+                                ) *
+                                chartHeight *
+                                0.92f
+                    }
+
+                val completedHeight =
+                    if (total == 0) {
+                        0f
+                    } else {
+                        (
+                                completed.toFloat() /
+                                        maxTotal
+                                ) *
+                                chartHeight *
+                                0.92f
+                    }
+
+                val baseY =
+                    size.height
+
+                if (totalHeight > 0f) {
+
+                    drawRoundRect(
+                        color = SoftGreen,
+                        topLeft =
+                            Offset(
+                                x,
+                                baseY -
+                                        totalHeight
+                            ),
+                        size =
+                            Size(
+                                barWidth,
+                                totalHeight
+                            ),
+                        cornerRadius =
+                            CornerRadius(
+                                6.dp.toPx(),
+                                6.dp.toPx()
+                            )
+                    )
+                }
+
+                if (completedHeight > 0f) {
+
+                    drawRoundRect(
+                        color =
+                            if (day == today) {
+                                TriageGreenDark
+                            } else {
+                                TriageGreen
+                            },
+                        topLeft =
+                            Offset(
+                                x,
+                                baseY -
+                                        completedHeight
+                            ),
+                        size =
+                            Size(
+                                barWidth,
+                                completedHeight
+                            ),
+                        cornerRadius =
+                            CornerRadius(
+                                6.dp.toPx(),
+                                6.dp.toPx()
+                            )
+                    )
+                }
+            }
+        }
+
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.SpaceBetween
+        ) {
+
+            days.forEachIndexed {
+                    index,
+                    day ->
+
+                val isToday =
+                    day == today
+
+                Text(
+                    weekdayInitials[index],
+                    fontSize = 13.sp,
+                    fontWeight =
+                        if (isToday) {
+                            FontWeight.Bold
+                        } else {
+                            FontWeight.Normal
+                        },
+                    color =
+                        if (isToday) {
+                            TriageGreenDark
+                        } else {
+                            TextSecondary
+                        },
+                    modifier =
+                        Modifier.width(36.dp),
+                    textAlign =
+                        TextAlign.Center
+                )
+            }
+        }
+
+        Row(
+            horizontalArrangement =
+                Arrangement.spacedBy(16.dp)
+        ) {
+
+            LegendDot(
+                SoftGreen,
+                "Total del día"
+            )
+
+            LegendDot(
+                TriageGreen,
+                "Completadas"
+            )
+        }
+    }
+}
+
+@Composable
+private fun LegendDot(
+    color: Color,
+    text: String
+) {
+
+    Row(
+        verticalAlignment =
+            Alignment.CenterVertically,
+        horizontalArrangement =
+            Arrangement.spacedBy(6.dp)
+    ) {
+
+        Box(
+            Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(color)
+        )
+
+        Text(
+            text,
+            fontSize = 12.sp,
+            color =
+                TextSecondary
+        )
+    }
+}
 
 @Composable
 private fun BySubjectCard(
@@ -339,29 +791,88 @@ private fun BySubjectCard(
     subjects: List<Subject>,
     colorFor: (String) -> Color
 ) {
+
     Column(
-        Modifier.fillMaxWidth().triageCard().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        Modifier
+            .fillMaxWidth()
+            .triageCard()
+            .padding(16.dp),
+        verticalArrangement =
+            Arrangement.spacedBy(14.dp)
     ) {
-        Text("Por materia", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = TriageGreenDark)
+
+        Text(
+            "Por materia",
+            fontSize = 18.sp,
+            fontWeight =
+                FontWeight.SemiBold,
+            color =
+                TriageGreenDark
+        )
+
         rows.forEach { row ->
-            val color = colorFor(row.name)
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(9.dp).clip(CircleShape).background(color))
+
+            val color =
+                colorFor(row.name)
+
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(6.dp)
+            ) {
+
+                Row(
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+
+                    Box(
+                        Modifier
+                            .size(9.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                    )
+
                     Text(
                         row.name,
-                        Modifier.padding(start = 8.dp).weight(1f),
+                        Modifier
+                            .padding(
+                                start = 8.dp
+                            )
+                            .weight(1f),
                         fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight =
+                            FontWeight.Medium
                     )
-                    Text("${row.done}/${row.total}", fontSize = 14.sp, color = TextSecondary)
+
+                    Text(
+                        "${row.done}/${row.total}",
+                        fontSize = 14.sp,
+                        color =
+                            TextSecondary
+                    )
                 }
+
                 LinearProgressIndicator(
-                    progress = { if (row.total == 0) 0f else row.done.toFloat() / row.total },
-                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                    progress = {
+                        if (row.total == 0) {
+                            0f
+                        } else {
+                            row.done.toFloat() /
+                                    row.total
+                        }
+                    },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(
+                                RoundedCornerShape(
+                                    3.dp
+                                )
+                            ),
                     color = color,
-                    trackColor = SoftGreen
+                    trackColor =
+                        SoftGreen
                 )
             }
         }
@@ -369,96 +880,136 @@ private fun BySubjectCard(
 }
 
 @Composable
-private fun SubjectInsightCard(subject: SubjectProgress) {
-    val completion = if (subject.total > 0) {
-        (subject.done * 100) / subject.total
-    } else {
-        0
-    }
+private fun SubjectInsightCard(
+    subject: SubjectProgress
+) {
 
-    val remaining = subject.total - subject.done
+    val completion =
+        subject.completionPercent
+
+    val remaining =
+        subject.remaining
 
     Column(
         Modifier
             .fillMaxWidth()
             .triageCard()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement =
+            Arrangement.spacedBy(10.dp)
     ) {
+
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            verticalAlignment =
+                Alignment.CenterVertically,
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
         ) {
+
             Box(
                 Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFFFF1D6)),
-                contentAlignment = Alignment.Center
+                    .background(
+                        Color(0xFFFFF1D6)
+                    ),
+                contentAlignment =
+                    Alignment.Center
             ) {
+
                 Text(
                     "!",
                     fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFB45309)
+                    fontWeight =
+                        FontWeight.Bold,
+                    color =
+                        Color(0xFFB45309)
                 )
             }
 
             Text(
                 "Materia que necesita atención",
                 fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = TriageGreenDark
+                fontWeight =
+                    FontWeight.SemiBold,
+                color =
+                    TriageGreenDark
             )
         }
 
         Text(
             subject.name,
             fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = TriageGreenDark
+            fontWeight =
+                FontWeight.Bold,
+            color =
+                TriageGreenDark
         )
 
         Text(
             "Tiene el menor porcentaje de cumplimiento entre tus materias en este periodo.",
             fontSize = 14.sp,
-            color = TextSecondary
+            color =
+                TextSecondary
         )
 
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement =
+                Arrangement.SpaceBetween,
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
+
             Text(
                 "Cumplimiento",
                 fontSize = 14.sp,
-                color = TextSecondary
+                color =
+                    TextSecondary
             )
 
             Text(
                 "$completion%",
                 fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFFB45309)
+                fontWeight =
+                    FontWeight.Bold,
+                color =
+                    Color(0xFFB45309)
             )
         }
 
         LinearProgressIndicator(
-            progress = { completion / 100f },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp)),
-            color = Color(0xFFD97706),
-            trackColor = SoftGreen
+            progress = {
+                completion / 100f
+            },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(
+                        RoundedCornerShape(
+                            4.dp
+                        )
+                    ),
+            color =
+                Color(0xFFD97706),
+            trackColor =
+                SoftGreen
         )
 
         Text(
-            "$remaining ${if (remaining == 1) "actividad pendiente" else "actividades pendientes"} de ${subject.total}",
+            "$remaining ${
+                if (remaining == 1) {
+                    "actividad pendiente"
+                } else {
+                    "actividades pendientes"
+                }
+            } de ${subject.total}",
             fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = TextSecondary
+            fontWeight =
+                FontWeight.Medium,
+            color =
+                TextSecondary
         )
     }
 }
@@ -471,195 +1022,219 @@ private fun MotivationCard(
     pending: Int,
     pct: Int
 ) {
-    val (title, body) = when {
-        total == 0 ->
-            "Empieza tu plan" to "Aún no hay actividades en este periodo. Usa el botón + para crear la primera."
-        overdue > 0 ->
-            "Revisa lo vencido" to "Tienes $overdue ${if (overdue == 1) "actividad vencida" else "actividades vencidas"}. Complétalas o ajústales la fecha."
-        pending == 0 ->
-            "¡Todo al día!" to "Has completado todas las actividades de este periodo. Buen trabajo."
-        highPending > 0 ->
-            "Prioriza lo urgente" to "Tienes $highPending ${if (highPending == 1) "actividad" else "actividades"} de prioridad alta pendiente. Enfócate en ellas primero."
-        else ->
-            "Buen ritmo" to "Llevas un $pct% de cumplimiento en este periodo. Sigue así, paso a paso."
-    }
+
+    val message =
+        when {
+            total == 0 ->
+                "Empieza tu plan" to
+                        "Aún no hay actividades en este periodo. Usa el botón + para crear la primera."
+
+            overdue > 0 ->
+                "Revisa lo vencido" to
+                        "Tienes $overdue ${
+                            if (overdue == 1) {
+                                "actividad vencida"
+                            } else {
+                                "actividades vencidas"
+                            }
+                        }. Complétalas o ajústales la fecha."
+
+            pending == 0 ->
+                "¡Todo al día!" to
+                        "Has completado todas las actividades de este periodo. Buen trabajo."
+
+            highPending > 0 ->
+                "Prioriza lo urgente" to
+                        "Tienes $highPending ${
+                            if (highPending == 1) {
+                                "actividad"
+                            } else {
+                                "actividades"
+                            }
+                        } de prioridad alta pendiente. Enfócate en ellas primero."
+
+            else ->
+                "Buen ritmo" to
+                        "Llevas un $pct% de cumplimiento en este periodo. Sigue así, paso a paso."
+        }
+
+    val title =
+        message.first
+
+    val body =
+        message.second
 
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(SoftGreen).padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        Modifier
+            .fillMaxWidth()
+            .clip(
+                RoundedCornerShape(
+                    18.dp
+                )
+            )
+            .background(SoftGreen)
+            .padding(18.dp),
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
     ) {
-        Text(title, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = TriageGreenDark)
-        Text(body, fontSize = 15.sp, color = TextSecondary)
+
+        Text(
+            title,
+            fontSize = 19.sp,
+            fontWeight =
+                FontWeight.SemiBold,
+            color =
+                TriageGreenDark
+        )
+
+        Text(
+            body,
+            fontSize = 15.sp,
+            color =
+                TextSecondary
+        )
     }
 }
 
-/**
- * Representa una recomendación generada a partir
- * de las actividades pendientes del estudiante.
- */
-private data class AcademicRecommendation(
-    val activity: Activity,
-    val reason: String,
-    val status: String
-)
-
-/**
- * Analiza las actividades y determina cuáles requieren
- * atención primero.
- */
-private fun buildAcademicRecommendations(
-    activities: List<Activity>,
-    nowMs: Long
-): List<AcademicRecommendation> {
-
-    val pendingActivities = activities
-        .filter { !it.completed }
-        .sortedWith(
-            compareBy<Activity> {
-                // Las actividades vencidas se atienden primero.
-                if (it.dueDate.toEpochMilliseconds() < nowMs) 0 else 1
-            }.thenBy {
-                // Después se considera la prioridad académica.
-                Priority.rank(it.priority)
-            }.thenBy {
-                // Finalmente, la fecha de entrega más cercana.
-                it.dueDate.toEpochMilliseconds()
-            }
-        )
-
-    return pendingActivities
-        .take(3)
-        .map { activity ->
-
-            val isOverdue =
-                activity.dueDate.toEpochMilliseconds() < nowMs
-
-            val reason = when {
-                isOverdue ->
-                    "Esta actividad ya está vencida. Es importante atenderla cuanto antes."
-
-                activity.priority == Priority.HIGH ->
-                    "Tiene prioridad alta. Conviene dedicarle atención antes que a otras actividades."
-
-                activity.priority == Priority.MEDIUM ->
-                    "Tiene prioridad media. Organiza tiempo para avanzar antes de su entrega."
-
-                else ->
-                    "Aunque tiene prioridad baja, es recomendable avanzar para evitar acumulaciones."
-            }
-
-            val status = when {
-                isOverdue -> "VENCIDA"
-                activity.priority == Priority.HIGH -> "PRIORIDAD ALTA"
-                activity.priority == Priority.MEDIUM -> "PRIORIDAD MEDIA"
-                else -> "PRIORIDAD BAJA"
-            }
-
-            AcademicRecommendation(
-                activity = activity,
-                reason = reason,
-                status = status
-            )
-        }
-}
-
-/**
- * Presenta las recomendaciones académicas en el panel de progreso.
- */
 @Composable
 private fun AcademicRecommendationsCard(
-    recommendations: List<AcademicRecommendation>
+    recommendations:
+    List<AcademicRecommendation>
 ) {
+
     Column(
         Modifier
             .fillMaxWidth()
             .triageCard()
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement =
+            Arrangement.spacedBy(14.dp)
     ) {
+
         Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            verticalAlignment =
+                Alignment.CenterVertically,
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
         ) {
+
             Text(
                 "✦",
                 fontSize = 25.sp,
-                color = Color(0xFFD97706)
+                color =
+                    Color(0xFFD97706)
             )
 
             Column {
+
                 Text(
                     "Recomendaciones académicas",
                     fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TriageGreenDark
+                    fontWeight =
+                        FontWeight.Bold,
+                    color =
+                        TriageGreenDark
                 )
 
                 Text(
                     "Actividades que requieren tu atención",
                     fontSize = 12.sp,
-                    color = TextSecondary
+                    color =
+                        TextSecondary
                 )
             }
         }
 
-        recommendations.forEachIndexed { index, recommendation ->
-            val activity = recommendation.activity
+        recommendations
+            .forEachIndexed {
+                    index,
+                    recommendation ->
 
-            Column(
-                Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Row(
+                val activity =
+                    recommendation.activity
+
+                Column(
                     Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement =
+                        Arrangement.spacedBy(6.dp)
                 ) {
+
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement =
+                            Arrangement.SpaceBetween,
+                        verticalAlignment =
+                            Alignment.CenterVertically
+                    ) {
+
+                        Text(
+                            "${index + 1}. ${activity.title}",
+                            modifier =
+                                Modifier.weight(1f),
+                            fontSize = 15.sp,
+                            fontWeight =
+                                FontWeight.SemiBold,
+                            color =
+                                TriageGreenDark
+                        )
+                    }
+
                     Text(
-                        "${index + 1}. ${activity.title}",
-                        modifier = Modifier.weight(1f),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TriageGreenDark
+                        activity.subject,
+                        fontSize = 12.sp,
+                        color =
+                            TextSecondary
+                    )
+
+                    Text(
+                        recommendation.status,
+                        fontSize = 11.sp,
+                        fontWeight =
+                            FontWeight.Bold,
+                        color =
+                            when (
+                                recommendation.status
+                            ) {
+                                "VENCIDA" ->
+                                    ErrorRed
+
+                                "PRIORIDAD ALTA" ->
+                                    Color(0xFFB45309)
+
+                                "PRIORIDAD MEDIA" ->
+                                    Color(0xFFCA8A04)
+
+                                else ->
+                                    TriageGreen
+                            }
+                    )
+
+                    Text(
+                        recommendation.reason,
+                        fontSize = 13.sp,
+                        color =
+                            TextSecondary
                     )
                 }
 
-                Text(
-                    activity.subject,
-                    fontSize = 12.sp,
-                    color = TextSecondary
-                )
+                if (
+                    index !=
+                    recommendations.lastIndex
+                ) {
 
-                Text(
-                    recommendation.status,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = when (recommendation.status) {
-                        "VENCIDA" -> ErrorRed
-                        "PRIORIDAD ALTA" -> Color(0xFFB45309)
-                        "PRIORIDAD MEDIA" -> Color(0xFFCA8A04)
-                        else -> TriageGreen
-                    }
-                )
-
-                Text(
-                    recommendation.reason,
-                    fontSize = 13.sp,
-                    color = TextSecondary
-                )
+                    androidx.compose.material3
+                        .HorizontalDivider(
+                            color =
+                                SoftGreen
+                        )
+                }
             }
-
-            if (index != recommendations.lastIndex) {
-                androidx.compose.material3.HorizontalDivider(
-                    color = SoftGreen
-                )
-            }
-        }
 
         Text(
             "Las recomendaciones se actualizan automáticamente cuando cambian tus actividades.",
             fontSize = 11.sp,
-            color = TextSecondary
+            color =
+                TextSecondary
         )
     }
 }
