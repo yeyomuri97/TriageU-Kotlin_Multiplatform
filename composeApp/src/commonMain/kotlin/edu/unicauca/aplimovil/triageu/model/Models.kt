@@ -84,7 +84,7 @@ object SubjectDefaults {
  * Representa un concepto académico del glosario de TriageU.
  *
  * Cada término tiene un identificador, nombre, definición
- * y una categoría para organizarlo.
+ * y una categoría para organizarlo..
  */
 data class GlossaryTerm(
     val id: String,
